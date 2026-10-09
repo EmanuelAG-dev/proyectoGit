@@ -1,0 +1,72 @@
+name: CI - develop
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ci-develop
+  cancel-in-progress: false
+
+jobs:
+  update-readme:
+    if: (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/develop') && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Descargar develop
+        uses: actions/checkout@v6
+        with:
+          ref: develop
+
+      - name: Registrar la rama en el README
+        shell: bash
+        env:
+          FEATURE_BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          if [ ! -f README.md ]; then
+            printf '# proyectoGit\n\nAppVersion-0\n\n## Funcionalidades\n' > README.md
+          fi
+
+          line="Añadida feature: $FEATURE_BRANCH"
+          if ! grep -Fqx -- "$line" README.md; then
+            printf '\n%s\n' "$line" >> README.md
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          if git diff --cached --quiet; then
+            echo "La rama ya estaba registrada en el README."
+          else
+            git commit -m "Registrar feature en README"
+            git push origin HEAD:refs/heads/develop
+          fi
+
+  validate-dev:
+    needs: update-readme
+    runs-on: self-hosted
+    steps:
+      - name: Comparar el token de desarrollo
+        shell: bash
+        env:
+          DEV_TOKEN: ${{ secrets.DEV_TOKEN }}
+        run: |
+          if [ -z "${DEV_TOKEN:-}" ] || [ -z "${LOCAL_DEV_TOKEN:-}" ]; then
+            echo "ERROR: falta DEV_TOKEN o LOCAL_DEV_TOKEN."
+            exit 1
+          fi
+
+          if [ "$DEV_TOKEN" = "$LOCAL_DEV_TOKEN" ]; then
+            echo "Validacion correcta: los tokens de desarrollo coinciden."
+          else
+            echo "ERROR: los tokens de desarrollo no coinciden."
+            exit 1
+          fi
