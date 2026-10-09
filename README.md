@@ -1,6 +1,6 @@
 # proyectoGit
 
-AppVersion-1 | 2026-10-09 18:02:59 CEST
+AppVersion-2 | 2026-10-09 18:28:35 CEST
 
 ## Funcionalidades
 
